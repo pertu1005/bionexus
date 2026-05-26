@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BioNexus — Multi-Agent Drug Discovery & Computational Genomics Platform</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#040a0a;--surface:#111827;--surface2:#1a2332;--border:#2a3a4f;--text:#e2e8f0;--text-dim:#8899aa;--accent:#00ff88;--accent2:#4488ff;--gold:#ffd700;--red:#ff4444;--green:#00ff88;--blue:#4488ff;--orange:#ff8800;--white:#ffffff}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh;width:100vw}
+#bg-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.app{display:grid;grid-template-columns:260px 1fr 300px;grid-template-rows:50px 1fr 200px;height:100vh;position:relative;z-index:1}
+.header{grid-column:1/-1;background:linear-gradient(90deg,#040a0a,#111827,#040a0a);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;gap:16px}
+.header h1{font-size:20px;background:linear-gradient(135deg,#00ff88,#4488ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:800;letter-spacing:-0.5px}
+.header .sub{color:var(--text-dim);font-size:11px}
+.header .status{margin-left:auto;display:flex;gap:12px;align-items:center}
+.badge{background:#00ff8822;color:#00ff88;border:1px solid #00ff8844;padding:2px 10px;border-radius:12px;font-size:10px;font-weight:600}
+.badge-live{background:#00ff8822;color:#00ff88;border-color:#00ff8844;animation:badge-pulse 2s infinite}
+@keyframes badge-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+/* Left panel */
+.left-panel{background:var(--surface);border-right:1px solid var(--border);padding:12px;overflow-y:auto}
+.panel-title{font-size:11px;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700}
+.agent-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.agent-card:hover{border-color:var(--accent);transform:translateX(2px)}
+.agent-card.active{border-color:var(--accent);box-shadow:0 0 15px #00ff8815}
+.agent-card.active::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.agent-head{display:flex;align-items:center;gap:8px}
+.agent-emoji{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--bg)}
+.agent-name{font-size:12px;font-weight:600;flex:1}
+.agent-role{font-size:9px;color:var(--text-dim);margin-top:2px;margin-left:38px}
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.status-dot.idle{background:#444}
+.status-dot.active{background:var(--green);box-shadow:0 0 6px var(--green);animation:dot-pulse 1s infinite}
+.status-dot.thinking{background:var(--gold);box-shadow:0 0 6px var(--gold);animation:dot-pulse .4s infinite}
+@keyframes dot-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+/* Main area */
+.main-area{background:var(--bg);position:relative;overflow:hidden;padding:16px}
+.main-area h2{font-size:14px;color:var(--accent);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.main-content{height:calc(100% - 40px);overflow-y:auto}
+/* Grid viz */
+.grid-container{display:grid;gap:3px}
+.grid-cell{background:var(--surface2);border:1px solid var(--border);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:monospace;transition:all .3s;min-height:28px}
+.grid-cell.active{border-color:var(--accent);color:var(--accent);background:#00ff880a}
+.grid-cell.highlight{animation:cell-glow .6s ease-out}
+@keyframes cell-glow{0%{box-shadow:0 0 12px #00ff8866}100%{box-shadow:none}}
+/* Info chips */
+.info-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.info-chip{background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:14px;font-size:10px;display:flex;align-items:center;gap:4px}
+.info-chip .val{color:var(--accent);font-weight:700}
+/* Right panel - dispatch */
+.right-panel{background:var(--surface);border-left:1px solid var(--border);padding:12px;display:flex;flex-direction:column;overflow:hidden}
+.dispatch-log{flex:1;overflow-y:auto}
+.dispatch-entry{padding:6px 8px;margin-bottom:3px;border-radius:4px;border-left:3px solid var(--border);background:var(--surface2);animation:entry-in .3s ease-out;font-size:10px}
+@keyframes entry-in{from{transform:translateX(16px);opacity:0}to{transform:translateX(0);opacity:1}}
+.dispatch-entry .e-head{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.dispatch-entry .e-marker{font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700}
+.dispatch-entry .e-time{font-size:9px;color:var(--text-dim);margin-left:auto}
+.dispatch-entry .e-msg{color:var(--text-dim);line-height:1.4;font-family:monospace}
+/* Bottom panel - cycles */
+.bottom-panel{grid-column:1/-1;background:var(--surface);border-top:1px solid var(--border);padding:12px 20px;overflow-y:auto}
+.cycle-header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.cycle-header h3{font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:1px}
+.cycle-bar{display:flex;gap:3px;margin-bottom:4px}
+.cycle-phase{flex:1;height:6px;border-radius:3px;background:var(--surface2);position:relative;overflow:hidden;transition:all .5s}
+.cycle-phase.active{background:linear-gradient(90deg,#00ff88,#4488ff)}
+.cycle-phase.done{background:var(--green)}
+.cycle-labels{display:flex;gap:3px}
+.cycle-label{flex:1;text-align:center;font-size:8px;color:var(--text-dim);transition:color .3s}
+.cycle-label.active{color:var(--accent);font-weight:700}
+.cycle-label.done{color:var(--green)}
+.cycle-info{display:flex;gap:16px;margin-top:6px;align-items:center}
+.cycle-project{font-size:12px}
+.cycle-project .pname{color:var(--gold);font-weight:700}
+.stats{display:flex;gap:16px;margin-left:auto}
+.stat{font-size:10px;color:var(--text-dim)}
+.stat .sval{color:var(--accent);font-weight:700}
+/* Chart area */
+.chart-area{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:8px}
+.chart-area canvas{width:100%;height:80px}
+/* Scrollbar */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+/* Toast */
+.toast{position:fixed;top:60px;right:20px;background:var(--surface);border:1px solid var(--accent);padding:8px 14px;border-radius:8px;font-size:11px;z-index:100;animation:toast-in .3s;box-shadow:0 4px 20px #0005}
+@keyframes toast-in{from{transform:translateY(-16px);opacity:0}to{transform:translateY(0);opacity:1}}
+/* Responsive */
+@media(max-width:900px){.app{grid-template-columns:200px 1fr 220px}}
+@media(max-width:700px){.app{grid-template-columns:1fr;grid-template-rows:50px auto 1fr 200px}}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div class="app" id="app"></div>
+<script>
+const CFG = {
+  name: "BioNexus",
+  agents: [{"name": "GenomeReader", "emoji": "\ud83e\uddec", "role": "DNA/RNA analysis", "color": "#00ff88"}, {"name": "ProteinFolder", "emoji": "\ud83d\udd2c", "role": "Protein structure prediction", "color": "#4488ff"}, {"name": "TargetFinder", "emoji": "\ud83c\udfaf", "role": "Drug target identification", "color": "#00e5ff"}, {"name": "MoleculeDesigner", "emoji": "\ud83d\udc8a", "role": "De novo drug design", "color": "#ff00ff"}, {"name": "DockSimulator", "emoji": "\ud83d\udd17", "role": "Molecular docking", "color": "#ffd700"}, {"name": "ToxicityPredictor", "emoji": "\u2620\ufe0f", "role": "ADMET prediction", "color": "#ff4444"}, {"name": "ClinicalModeler", "emoji": "\ud83d\udcca", "role": "Clinical trial modeling", "color": "#ff8800"}, {"name": "Orchestrator", "emoji": "\ud83e\udde0", "role": "Pipeline coordination", "color": "#ffffff"}],
+  projects: ["Cancer Immunotherapy Target", "Alzheimer Amyloid Inhibitor", "Broad-Spectrum Antiviral", "Diabetes GLP-1 Agonist", "Rare Disease Gene Therapy", "Antibiotic Resistance Buster", "Neuroinflammation Blocker", "Osteoporosis Anabolic Agent"],
+  phases: ["Sequence", "Fold", "Target", "Design", "Dock", "Toxicity", "Clinical", "Synthesize"],
+  metrics: ["Binding Affinity", "Selectivity", "ADMET Score", "IC50", "Bioavailability", "Half-Life"],
+  accent: "#00ff88",
+  accent2: "#4488ff"
+};
+
+// State
+let state = {
+  cycle: 0, phase: 0, project: 0,
+  agentStates: CFG.agents.map(() => "idle"),
+  logs: [],
+  gridData: [],
+  stats: {},
+  cycleCount: 0,
+  totalOps: 0
+};
+
+// Init grid data
+function initGrid() {
+  const rows = 8, cols = 16;
+  state.gridData = [];
+  for (let r = 0; r < rows; r++) {
+    state.gridData[r] = [];
+    for (let c = 0; c < cols; c++) {
+      state.gridData[r][c] = { active: false, value: "", color: "" };
+    }
+  }
+}
+
+// Background particles
+function initParticles() {
+  const canvas = document.getElementById("bg-canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const particles = [];
+  for (let i = 0; i < 80; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 2 + 0.5,
+      a: Math.random() * 0.3 + 0.1
+    });
+  }
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = canvas.width;
+      if (p.x > canvas.width) p.x = 0;
+      if (p.y < 0) p.y = canvas.height;
+      if (p.y > canvas.height) p.y = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = CFG.accent + Math.floor(p.a * 255).toString(16).padStart(2, "0");
+      ctx.fill();
+    });
+    // Draw connections
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 120) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = CFG.accent + Math.floor((1 - dist/120) * 20).toString(16).padStart(2, "0");
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+  window.addEventListener("resize", () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  });
+}
+
+// Render
+function render() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="header">
+      <h1>${CFG.name}</h1>
+      <span class="sub">${CFG.agents.length} AI Agents</span>
+      <div class="status">
+        <span class="badge badge-live">● LIVE</span>
+        <span class="badge">Cycle ${state.cycleCount}</span>
+        <span class="badge">${state.totalOps} ops</span>
+      </div>
+    </div>
+    <div class="left-panel">
+      <div class="panel-title">Agent Roster</div>
+      ${CFG.agents.map((a, i) => `
+        <div class="agent-card ${state.agentStates[i] === 'active' ? 'active' : ''}" onclick="selectAgent(${i})">
+          <div class="agent-head">
+            <div class="agent-emoji">${a.emoji}</div>
+            <span class="agent-name">${a.name}</span>
+            <span class="status-dot ${state.agentStates[i]}"></span>
+          </div>
+          <div class="agent-role">${a.role}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="main-area">
+      <h2>${CFG.name} Workspace</h2>
+      <div class="info-chips">
+        <div class="info-chip">Project: <span class="val">${CFG.projects[state.project]}</span></div>
+        <div class="info-chip">Phase: <span class="val">${CFG.phases[state.phase]}</span></div>
+        ${CFG.metrics.slice(0,3).map(m => `<div class="info-chip">${m}: <span class="val">${Math.floor(Math.random()*100)}</span></div>`).join('')}
+      </div>
+      <div class="main-content">
+        <div class="grid-container" style="grid-template-columns:60px repeat(${state.gridData[0]?.length || 16}, 1fr); grid-template-rows:repeat(${state.gridData.length || 8}, 28px)">
+          ${state.gridData.map((row, r) => `
+            <div class="grid-cell" style="background:transparent;border:none;color:${CFG.accent};font-size:9px">q[${r}]</div>
+            ${(row || []).map((cell, c) => `
+              <div class="grid-cell ${cell.active ? 'active highlight' : ''}" style="${cell.color ? 'border-color:'+cell.color+';color:'+cell.color : ''}">${cell.value}</div>
+            `).join('')}
+          `).join('')}
+        </div>
+        <div class="chart-area">
+          <canvas id="chart" height="80"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="right-panel">
+      <div class="panel-title">Agent Dispatch Log</div>
+      <div class="dispatch-log" id="dispatch-log">
+        ${state.logs.slice(-30).map(l => `
+          <div class="dispatch-entry" style="border-left-color:${l.color}">
+            <div class="e-head">
+              <span class="e-marker" style="background:${l.color}22;color:${l.color}">${l.agent}</span>
+              <span class="e-time">${l.time}</span>
+            </div>
+            <div class="e-msg">${l.msg}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="bottom-panel">
+      <div class="cycle-header">
+        <h3>Research Cycle</h3>
+        <span class="badge">Cycle #${state.cycleCount}</span>
+      </div>
+      <div class="cycle-bar">
+        ${CFG.phases.map((ph, i) => `<div class="cycle-phase ${i < state.phase ? 'done' : i === state.phase ? 'active' : ''}"></div>`).join('')}
+      </div>
+      <div class="cycle-labels">
+        ${CFG.phases.map((ph, i) => `<div class="cycle-label ${i < state.phase ? 'done' : i === state.phase ? 'active' : ''}">${ph}</div>`).join('')}
+      </div>
+      <div class="cycle-info">
+        <div class="cycle-project">Project: <span class="pname">${CFG.projects[state.project]}</span></div>
+        <div class="stats">
+          ${CFG.metrics.slice(0,4).map(m => `<div class="stat">${m}: <span class="sval">${(Math.random()*100).toFixed(1)}</span></div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  // Auto-scroll dispatch log
+  const log = document.getElementById("dispatch-log");
+  if (log) log.scrollTop = log.scrollHeight;
+  drawChart();
+}
+
+function drawChart() {
+  const canvas = document.getElementById("chart");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  canvas.width = canvas.parentElement.clientWidth - 24;
+  const w = canvas.width, h = 80;
+  ctx.clearRect(0, 0, w, h);
+  // Draw a simple line chart
+  const points = 30;
+  const data = [];
+  for (let i = 0; i < points; i++) data.push(Math.random() * 60 + 10);
+  ctx.beginPath();
+  ctx.moveTo(0, h - data[0]);
+  for (let i = 1; i < points; i++) {
+    ctx.lineTo((i / (points-1)) * w, h - data[i]);
+  }
+  ctx.strokeStyle = CFG.accent;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Fill
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.fillStyle = CFG.accent + "15";
+  ctx.fill();
+}
+
+function selectAgent(i) {
+  showToast(`${CFG.agents[i].emoji} ${CFG.agents[i].name} — ${CFG.agents[i].role}`);
+}
+
+function showToast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function addLog(agentIdx, msg) {
+  const a = CFG.agents[agentIdx];
+  const now = new Date();
+  const time = now.toLocaleTimeString();
+  state.logs.push({ agent: a.name, color: a.color, msg, time });
+  if (state.logs.length > 100) state.logs.shift();
+  state.totalOps++;
+}
+
+function setAgent(idx, status) {
+  state.agentStates[idx] = status;
+}
+
+function updateGrid(cells) {
+  cells.forEach(([r, c, val, color]) => {
+    if (state.gridData[r] && state.gridData[r][c]) {
+      state.gridData[r][c] = { active: true, value: val, color: color || CFG.accent };
+    }
+  });
+}
+
+// Simulation engine
+const SIM_MESSAGES = [
+  [0, "Analyzing qubit topology for optimal connectivity..."],
+  [0, "Proposing 8-qubit ring lattice architecture"],
+  [1, "Running gate synthesis on proposed circuit..."],
+  [1, "Reduced gate count from 47 to 32 via template matching"],
+  [2, "Generating Bell pair entanglement map..."],
+  [2, "Max entanglement depth: 4 qubits verified"],
+  [3, "T1/T2 coherence times: 45μs / 32μs"],
+  [3, "Noise channel simulation: depolarizing 0.001"],
+  [4, "Running stabilizer formalism verification..."],
+  [4, "Circuit passes all parity checks ✓"],
+  [5, "State vector simulation: 256 amplitudes computed"],
+  [5, "Measurement probabilities validated within tolerance"],
+  [6, "Applying surface code (d=3) error correction..."],
+  [6, "Logical error rate: 10^-6 achieved"],
+  [7, "Synthesizing results from all agents..."],
+  [7, "Cycle complete. Circuit fidelity: 99.7%"],
+];
+
+function runSimulationStep() {
+  const msg = SIM_MESSAGES[state.cycle % SIM_MESSAGES.length];
+  const agentIdx = msg[0];
+  const text = msg[1];
+  
+  // Set agent active
+  setAgent(agentIdx, "thinking");
+  render();
+  
+  setTimeout(() => {
+    addLog(agentIdx, text);
+    setAgent(agentIdx, "active");
+    
+    // Update grid
+    const r = Math.floor(Math.random() * 8);
+    const c = Math.floor(Math.random() * 16);
+    const gates = ["H", "X", "CNOT", "T", "Z", "Rx", "S", "Y"];
+    const g = gates[Math.floor(Math.random() * gates.length)];
+    const colors = [CFG.accent, CFG.accent2, "#ffd700", "#ff4444", "#00ff88"];
+    updateGrid([[r, c, g, colors[Math.floor(Math.random()*colors.length)]]]);
+    
+    render();
+    
+    setTimeout(() => {
+      setAgent(agentIdx, "idle");
+      state.cycle++;
+      if (state.cycle % SIM_MESSAGES.length === 0) {
+        state.cycleCount++;
+        state.phase = (state.phase + 1) % CFG.phases.length;
+        if (state.phase === 0) {
+          state.project = (state.project + 1) % CFG.projects.length;
+          // Reset grid
+          initGrid();
+        }
+      } else {
+        state.phase = state.cycle % CFG.phases.length;
+      }
+      render();
+    }, 800);
+  }, 600);
+}
+
+// Init
+initGrid();
+render();
+initParticles();
+setInterval(runSimulationStep, 2500);
+setInterval(render, 5000);
+showToast(`🚀 ${CFG.name} initialized with ${CFG.agents.length} agents`);
+</script>
+</body>
+</html>
